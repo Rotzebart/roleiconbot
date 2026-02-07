@@ -121,4 +121,6 @@ client.on("interactionCreate", async (interaction) => {
 
 // === Bot Login ===
 // Wichtig: DISCORD_TOKEN muss als Secret / Environment Variable in Replit gesetzt werden!
-client.login(process.env.DISCORD_TOKEN);
+client.login("DMTQ2OTQ3MjkxNTQ1OTI3NjgzMg.GzPw5L.c_Zg-v5yIk7qec6yVDo2DZI02rEfyijjC-rci0");
+
+
