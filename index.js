@@ -47,13 +47,26 @@ client.once("ready", async () => {
   console.log(`✅ Eingeloggt als ${client.user.tag}`);
 
   const guild = client.guilds.cache.first();
-  const channel = guild.channels.cache.get("1469483502503333938"); // <-- hier echte Channel-ID einsetzen
-
-  if (!channel) {
-    console.log("⚠️ Channel nicht gefunden oder Bot hat keine Rechte!");
+  if (!guild) {
+    console.log("⚠️ Bot ist in keinem Server!");
     return;
   }
 
+  const channel = guild.channels.cache.get("1469483502503333938"); // <-- echte Channel-ID
+
+  if (!channel) {
+    console.log("⚠️ Channel nicht gefunden!");
+    return;
+  }
+
+  // Rechte prüfen
+  const botMember = guild.members.cache.get(client.user.id);
+  if (!channel.permissionsFor(botMember).has(["SendMessages", "ViewChannel"])) {
+    console.log("⚠️ Bot hat keine Berechtigung, in diesem Channel zu schreiben oder ihn zu sehen!");
+    return;
+  }
+
+  // === Buttons erstellen ===
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("tank").setLabel("🛡️ Tank").setStyle(ButtonStyle.Primary),
     new ButtonBuilder().setCustomId("heal").setLabel("🩹 Heiler").setStyle(ButtonStyle.Success),
@@ -61,12 +74,18 @@ client.once("ready", async () => {
     new ButtonBuilder().setCustomId("reset").setLabel("❌ Reset").setStyle(ButtonStyle.Secondary)
   );
 
-  await channel.send({
-    content: "🎮 **Wähle deine Rolle(n) für den Nickname:**\nKlicke auf die Buttons, um die Rollen vor deinem Namen anzuzeigen. Klicke erneut, um sie zu entfernen.",
-    components: [row],
-  });
+  try {
+    await channel.send({
+      content:
+        "🎮 **Wähle deine Rolle(n) für den Nickname:**\nKlicke auf die Buttons, um die Rollen vor deinem Namen anzuzeigen. Klicke erneut, um sie zu entfernen.",
+      components: [row],
+    });
+    console.log("📨 Button-Message gesendet");
+  } catch (err) {
+    console.error("⚠️ Nachricht konnte nicht gesendet werden:", err.message);
+  }
+});
 
-  console.log("📨 Button-Message gesendet");
 });
 
 // === Button Event ===
@@ -103,4 +122,5 @@ client.on("interactionCreate", async (interaction) => {
 
 // === Bot Login ===
 client.login("MTQ2OTQ3MjkxNTQ1OTI3NjgzMg.GzPw5L.c_Zg-v5yIk7qec6yVDo2DZI02rEfyijjC-rci0"); // <-- Token hier direkt einsetzen
+
 
