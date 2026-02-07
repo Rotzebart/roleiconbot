@@ -1,8 +1,10 @@
 // === Module laden ===
 const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const express = require("express");
+const fs = require("fs");
+const path = require("path");
 
-// === Keep-Alive Server für Replit ===
+// === Keep-Alive Server für Railway / Replit ===
 const app = express();
 app.get("/", (req, res) => res.send("Bot läuft 24/7"));
 app.listen(3000, () => console.log("🌐 Keep-Alive Server gestartet"));
@@ -21,7 +23,6 @@ const ICONS = {
 
 // === Hilfsfunktionen ===
 function cleanName(name) {
-  // Entfernt bestehende Icons
   return name.replace(/🛡️|🩹|⚔️/g, "").trim();
 }
 
@@ -36,14 +37,28 @@ function parseIcons(name) {
 function buildNameWithIcons(nickname, icons) {
   const iconStr = icons.map((i) => ICONS[i]).join("");
   let newName = `${iconStr} ${nickname}`;
-
-  // Maximal 32 Zeichen prüfen
   if (newName.length > 32) {
-    const allowedLength = 32 - iconStr.length - 1; // -1 für Leerzeichen
+    const allowedLength = 32 - iconStr.length - 1;
     newName = `${iconStr} ${nickname.slice(0, allowedLength)}`;
   }
-
   return newName;
+}
+
+// === JSON-Datei für Message-ID ===
+const DATA_FILE = path.join(__dirname, "roleMessage.json");
+
+function saveMessageId(id) {
+  fs.writeFileSync(DATA_FILE, JSON.stringify({ id }));
+}
+
+function loadMessageId() {
+  if (!fs.existsSync(DATA_FILE)) return null;
+  const data = fs.readFileSync(DATA_FILE, "utf8");
+  try {
+    return JSON.parse(data).id;
+  } catch {
+    return null;
+  }
 }
 
 // === Ready Event ===
@@ -51,11 +66,33 @@ client.once("ready", async () => {
   console.log(`✅ Eingeloggt als ${client.user.tag}`);
 
   const guild = client.guilds.cache.first();
-  const channel = guild.channels.cache.get("1469483502503333938"); // <-- HIER echte Channel-ID einsetzen
+  if (!guild) {
+    console.log("⚠️ Bot ist in keinem Server!");
+    return;
+  }
+
+  const channel = guild.channels.cache.get("1469483502503333938"); // <-- echte Channel-ID
 
   if (!channel) {
-    console.log("⚠️ Channel nicht gefunden oder Bot hat keine Rechte!");
+    console.log("⚠️ Channel nicht gefunden!");
     return;
+  }
+
+  const botMember = guild.members.cache.get(client.user.id);
+  if (!channel.permissionsFor(botMember).has(["SendMessages", "ViewChannel"])) {
+    console.log("⚠️ Bot hat keine Berechtigung, in diesem Channel zu schreiben oder ihn zu sehen!");
+    return;
+  }
+
+  // === Prüfen, ob Nachricht schon existiert ===
+  let roleMessageId = loadMessageId();
+  if (roleMessageId) {
+    try {
+      const msg = await channel.messages.fetch(roleMessageId);
+      if (msg) return console.log("📨 Nachricht existiert bereits, sende nichts neu");
+    } catch {
+      // Nachricht existiert nicht mehr → neue Nachricht senden
+    }
   }
 
   // === Buttons erstellen ===
@@ -66,28 +103,27 @@ client.once("ready", async () => {
     new ButtonBuilder().setCustomId("reset").setLabel("❌ Reset").setStyle(ButtonStyle.Secondary)
   );
 
-  // === Nachricht senden ===
-  await channel.send({
-    content:
-      "🎮 **Wähle deine Rolle(n) für den Nickname:**\nKlicke auf die Buttons, um die Rollen vor deinem Namen anzuzeigen. Klicke erneut, um sie zu entfernen.",
-    components: [row],
-  });
+  try {
+    const message = await channel.send({
+      content:
+        "🎮 **Wähle deine Rolle(n) für den Nickname:**\nKlicke auf die Buttons, um die Rollen vor deinem Namen anzuzeigen. Klicke erneut, um sie zu entfernen.",
+      components: [row],
+    });
 
-  console.log("📨 Button-Message gesendet");
+    saveMessageId(message.id); // Message-ID speichern
+    console.log("📨 Button-Message gesendet und ID gespeichert");
+  } catch (err) {
+    console.error("⚠️ Nachricht konnte nicht gesendet werden:", err.message);
+  }
 });
 
-// === Button-Event ===
+// === Button Event ===
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isButton()) return;
 
   const member = interaction.member;
-
-  // Admins ignorieren
   if (member.permissions.has("ManageNicknames")) {
-    await interaction.reply({
-      content: "⚠️ Admins können nicht über den Bot geändert werden!",
-      ephemeral: true,
-    });
+    await interaction.reply({ content: "⚠️ Admins können nicht geändert werden!", ephemeral: true });
     return;
   }
 
@@ -106,19 +142,18 @@ client.on("interactionCreate", async (interaction) => {
 
   try {
     await member.setNickname(buildNameWithIcons(cleanName(currentName), icons));
-    await interaction.reply({
-      content: "✅ Icons aktualisiert!",
-      ephemeral: true,
-    });
+    await interaction.reply({ content: "✅ Icons aktualisiert!", ephemeral: true });
   } catch (err) {
     console.error("Fehler beim Nickname ändern:", err);
-    await interaction.reply({
-      content: "⚠️ Konnte Icons nicht setzen (fehlende Rechte?)",
-      ephemeral: true,
-    });
+    if (interaction.replied || interaction.deferred) {
+      await interaction.followUp({ content: "⚠️ Konnte Icons nicht setzen (fehlende Rechte?)", ephemeral: true });
+    } else {
+      await interaction.reply({ content: "⚠️ Konnte Icons nicht setzen (fehlende Rechte?)", ephemeral: true });
+    }
   }
 });
 
 // === Bot Login ===
-// Wichtig: DISCORD_TOKEN muss als Secret / Environment Variable in Replit gesetzt werden!
-client.login(process.env.DISCORD_TOKEN);
+client.login("MTQ2OTQ3MjkxNTQ1OTI3NjgzMg.GzPw5L.c_Zg-v5yIk7qec6yVDo2DZI02rEfyijjC-rci0"); // <-- Token direkt einsetzen
+
+
