@@ -110,16 +110,23 @@ client.on("interactionCreate", async (interaction) => {
   }
 
   try {
-    await member.setNickname(buildNameWithIcons(cleanName(currentName), icons));
-    await interaction.reply({ content: "✅ Icons aktualisiert!", ephemeral: true });
-  } catch (err) {
-    console.error("Fehler beim Nickname ändern:", err);
+  await member.setNickname(buildNameWithIcons(cleanName(currentName), icons));
+  await interaction.reply({ content: "✅ Icons aktualisiert!", ephemeral: true });
+} catch (err) {
+  console.error("Fehler beim Nickname ändern:", err);
+  // Wenn die ursprüngliche Reply schon gesendet wurde, nutze followUp
+  if (interaction.replied || interaction.deferred) {
+    await interaction.followUp({ content: "⚠️ Konnte Icons nicht setzen (fehlende Rechte?)", ephemeral: true });
+  } else {
     await interaction.reply({ content: "⚠️ Konnte Icons nicht setzen (fehlende Rechte?)", ephemeral: true });
   }
+}
+
 });
 
 // === Bot Login ===
 client.login("MTQ2OTQ3MjkxNTQ1OTI3NjgzMg.GzPw5L.c_Zg-v5yIk7qec6yVDo2DZI02rEfyijjC-rci0"); // <-- Token hier direkt einsetzen
+
 
 
 
