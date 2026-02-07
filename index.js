@@ -2,7 +2,7 @@
 const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
 const express = require("express");
 
-// === Keep-Alive Server für Railway / Replit ===
+// === Keep-Alive Server für Replit ===
 const app = express();
 app.get("/", (req, res) => res.send("Bot läuft 24/7"));
 app.listen(3000, () => console.log("🌐 Keep-Alive Server gestartet"));
@@ -21,6 +21,7 @@ const ICONS = {
 
 // === Hilfsfunktionen ===
 function cleanName(name) {
+  // Entfernt bestehende Icons
   return name.replace(/🛡️|🩹|⚔️/g, "").trim();
 }
 
@@ -35,10 +36,13 @@ function parseIcons(name) {
 function buildNameWithIcons(nickname, icons) {
   const iconStr = icons.map((i) => ICONS[i]).join("");
   let newName = `${iconStr} ${nickname}`;
+
+  // Maximal 32 Zeichen prüfen
   if (newName.length > 32) {
-    const allowedLength = 32 - iconStr.length - 1;
+    const allowedLength = 32 - iconStr.length - 1; // -1 für Leerzeichen
     newName = `${iconStr} ${nickname.slice(0, allowedLength)}`;
   }
+
   return newName;
 }
 
@@ -47,22 +51,10 @@ client.once("ready", async () => {
   console.log(`✅ Eingeloggt als ${client.user.tag}`);
 
   const guild = client.guilds.cache.first();
-  if (!guild) {
-    console.log("⚠️ Bot ist in keinem Server!");
-    return;
-  }
-
-  const channel = guild.channels.cache.get("1469483502503333938"); // <-- echte Channel-ID
+  const channel = guild.channels.cache.get("1469483502503333938"); // <-- HIER echte Channel-ID einsetzen
 
   if (!channel) {
-    console.log("⚠️ Channel nicht gefunden!");
-    return;
-  }
-
-  // Rechte prüfen
-  const botMember = guild.members.cache.get(client.user.id);
-  if (!channel.permissionsFor(botMember).has(["SendMessages", "ViewChannel"])) {
-    console.log("⚠️ Bot hat keine Berechtigung, in diesem Channel zu schreiben oder ihn zu sehen!");
+    console.log("⚠️ Channel nicht gefunden oder Bot hat keine Rechte!");
     return;
   }
 
@@ -74,27 +66,28 @@ client.once("ready", async () => {
     new ButtonBuilder().setCustomId("reset").setLabel("❌ Reset").setStyle(ButtonStyle.Secondary)
   );
 
-  try {
-    await channel.send({
-      content:
-        "🎮 **Wähle deine Rolle(n) für den Nickname:**\nKlicke auf die Buttons, um die Rollen vor deinem Namen anzuzeigen. Klicke erneut, um sie zu entfernen.",
-      components: [row],
-    });
-    console.log("📨 Button-Message gesendet");
-  } catch (err) {
-    console.error("⚠️ Nachricht konnte nicht gesendet werden:", err.message);
-  }
+  // === Nachricht senden ===
+  await channel.send({
+    content:
+      "🎮 **Wähle deine Rolle(n) für den Nickname:**\nKlicke auf die Buttons, um die Rollen vor deinem Namen anzuzeigen. Klicke erneut, um sie zu entfernen.",
+    components: [row],
+  });
+
+  console.log("📨 Button-Message gesendet");
 });
 
-// === Button Event ===
+// === Button-Event ===
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isButton()) return;
 
   const member = interaction.member;
 
-  // Admins ausnehmen
+  // Admins ignorieren
   if (member.permissions.has("ManageNicknames")) {
-    await interaction.reply({ content: "⚠️ Admins können nicht geändert werden!", ephemeral: true });
+    await interaction.reply({
+      content: "⚠️ Admins können nicht über den Bot geändert werden!",
+      ephemeral: true,
+    });
     return;
   }
 
@@ -113,18 +106,19 @@ client.on("interactionCreate", async (interaction) => {
 
   try {
     await member.setNickname(buildNameWithIcons(cleanName(currentName), icons));
-    // Statt reply, nur Interaction updaten
-    await interaction.deferUpdate();
+    await interaction.reply({
+      content: "✅ Icons aktualisiert!",
+      ephemeral: true,
+    });
   } catch (err) {
     console.error("Fehler beim Nickname ändern:", err);
-    if (!interaction.replied) {
-      await interaction.reply({ content: "⚠️ Konnte Icons nicht setzen (fehlende Rechte?)", ephemeral: true });
-    }
+    await interaction.reply({
+      content: "⚠️ Konnte Icons nicht setzen (fehlende Rechte?)",
+      ephemeral: true,
+    });
   }
 });
 
 // === Bot Login ===
-client.login("MTQ2OTQ3MjkxNTQ1OTI3NjgzMg.GzPw5L.c_Zg-v5yIk7qec6yVDo2DZI02rEfyijjC-rci0");
-
-
-
+// Wichtig: DISCORD_TOKEN muss als Secret / Environment Variable in Replit gesetzt werden!
+client.login(process.env.DISCORD_TOKEN);
