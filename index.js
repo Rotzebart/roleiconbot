@@ -35,7 +35,7 @@ function parseIcons(name) {
 }
 
 function buildNameWithIcons(nickname, icons) {
-  const iconStr = icons.map((i) => ICONS[i]).join("");
+  const iconStr = icons.map(i => ICONS[i]).join("");
   let newName = `${iconStr} ${nickname}`;
   if (newName.length > 32) {
     const allowedLength = 32 - iconStr.length - 1;
@@ -53,9 +53,8 @@ function saveMessageId(id) {
 
 function loadMessageId() {
   if (!fs.existsSync(DATA_FILE)) return null;
-  const data = fs.readFileSync(DATA_FILE, "utf8");
   try {
-    return JSON.parse(data).id;
+    return JSON.parse(fs.readFileSync(DATA_FILE, "utf8")).id;
   } catch {
     return null;
   }
@@ -66,22 +65,14 @@ client.once("ready", async () => {
   console.log(`✅ Eingeloggt als ${client.user.tag}`);
 
   const guild = client.guilds.cache.first();
-  if (!guild) {
-    console.log("⚠️ Bot ist in keinem Server!");
-    return;
-  }
+  if (!guild) return console.log("⚠️ Bot ist in keinem Server!");
 
-  const channel = guild.channels.cache.get("1469483502503333938"); // <-- echte Channel-ID
-
-  if (!channel) {
-    console.log("⚠️ Channel nicht gefunden!");
-    return;
-  }
+  const channel = guild.channels.cache.get("1469483502503333938"); // <-- Channel-ID
+  if (!channel) return console.log("⚠️ Channel nicht gefunden!");
 
   const botMember = guild.members.cache.get(client.user.id);
   if (!channel.permissionsFor(botMember).has(["SendMessages", "ViewChannel"])) {
-    console.log("⚠️ Bot hat keine Berechtigung, in diesem Channel zu schreiben oder ihn zu sehen!");
-    return;
+    return console.log("⚠️ Bot hat keine Berechtigung, in diesem Channel zu schreiben oder ihn zu sehen!");
   }
 
   // === Prüfen, ob Nachricht schon existiert ===
@@ -105,12 +96,10 @@ client.once("ready", async () => {
 
   try {
     const message = await channel.send({
-      content:
-        "🎮 **Wähle deine Rolle(n) für den Nickname:**\nKlicke auf die Buttons, um die Rollen vor deinem Namen anzuzeigen. Klicke erneut, um sie zu entfernen.",
+      content: "🎮 **Wähle deine Rolle(n) für den Nickname:**\nKlicke auf die Buttons, um die Rollen vor deinem Namen anzuzeigen. Klicke erneut, um sie zu entfernen.",
       components: [row],
     });
-
-    saveMessageId(message.id); // Message-ID speichern
+    saveMessageId(message.id);
     console.log("📨 Button-Message gesendet und ID gespeichert");
   } catch (err) {
     console.error("⚠️ Nachricht konnte nicht gesendet werden:", err.message);
@@ -118,13 +107,12 @@ client.once("ready", async () => {
 });
 
 // === Button Event ===
-client.on("interactionCreate", async (interaction) => {
+client.on("interactionCreate", async interaction => {
   if (!interaction.isButton()) return;
 
   const member = interaction.member;
   if (member.permissions.has("ManageNicknames")) {
-    await interaction.reply({ content: "⚠️ Admins können nicht geändert werden!", ephemeral: true });
-    return;
+    return interaction.reply({ content: "⚠️ Admins können nicht geändert werden!", ephemeral: true });
   }
 
   const currentName = member.nickname || member.user.username;
@@ -134,7 +122,7 @@ client.on("interactionCreate", async (interaction) => {
     icons = [];
   } else {
     if (icons.includes(interaction.customId)) {
-      icons = icons.filter((i) => i !== interaction.customId);
+      icons = icons.filter(i => i !== interaction.customId);
     } else {
       icons.push(interaction.customId);
     }
@@ -142,7 +130,12 @@ client.on("interactionCreate", async (interaction) => {
 
   try {
     await member.setNickname(buildNameWithIcons(cleanName(currentName), icons));
-    await interaction.reply({ content: "✅ Icons aktualisiert!", ephemeral: true });
+
+    // **Update die bestehende Nachricht** → nichts wird neu gepostet
+    await interaction.update({
+      content: interaction.message.content,
+      components: interaction.message.components,
+    });
   } catch (err) {
     console.error("Fehler beim Nickname ändern:", err);
     if (interaction.replied || interaction.deferred) {
@@ -154,6 +147,4 @@ client.on("interactionCreate", async (interaction) => {
 });
 
 // === Bot Login ===
-client.login("MTQ2OTQ3MjkxNTQ1OTI3NjgzMg.GzPw5L.c_Zg-v5yIk7qec6yVDo2DZI02rEfyijjC-rci0"); // <-- Token direkt einsetzen
-
-
+client.login(process.env.BOT_TOKEN); // <-- Railway Variable
