@@ -20,25 +20,30 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
 });
 
-// === ICONS (HIER EMOJI-ID EINTRAGEN!) ===
+// === ICONS (Unicode-Emojis) ===
 const ICONS = {
   tank: "🛡️",
-  heal: "<:rolehealer:1469798353599594546>", // <-- HIER DEINE ID
+  heal: "💚", // Grünes Herz
   dps: "⚔️",
 };
 
 // === Hilfsfunktionen ===
 function cleanName(name) {
-  return name
-    .replace(/🛡️|⚔️|<:rolehealer:\d+>/g, "")
-    .trim();
+  // Entfernt alle ICONS aus dem Nickname
+  const iconRegex = new RegExp(
+    Object.values(ICONS)
+      .map(e => e.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+      .join("|"),
+    "g"
+  );
+  return name.replace(iconRegex, "").trim();
 }
 
 function parseIcons(name) {
   const icons = [];
-  if (name.includes("🛡️")) icons.push("tank");
-  if (name.includes("<:rolehealer:")) icons.push("heal");
-  if (name.includes("⚔️")) icons.push("dps");
+  if (name.includes(ICONS.tank)) icons.push("tank");
+  if (name.includes(ICONS.heal)) icons.push("heal");
+  if (name.includes(ICONS.dps)) icons.push("dps");
   return icons;
 }
 
@@ -101,7 +106,7 @@ client.once("ready", async () => {
     new ButtonBuilder()
       .setCustomId("heal")
       .setLabel("Heiler")
-      .setEmoji("1469798353599594546") // gleiche ID wie oben
+      .setEmoji("💚") // ✅ Unicode grünes Herz
       .setStyle(ButtonStyle.Success),
 
     new ButtonBuilder()
@@ -117,7 +122,7 @@ client.once("ready", async () => {
 
   const msg = await channel.send({
     content:
-      "🎮 **Wähle deine Rolle(n) für den Nickname)**\nKlicken = an/aus • Reset = alles weg",
+      "🎮 **Wähle deine Rolle(n) für den Nickname**\nKlicken = an/aus • Reset = alles weg",
     components: [row],
   });
 
@@ -164,4 +169,3 @@ client.on("interactionCreate", async interaction => {
 
 // === Login ===
 client.login(process.env.BOT_TOKEN);
-
