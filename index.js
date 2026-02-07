@@ -23,7 +23,7 @@ const client = new Client({
 // === ICONS (HIER EMOJI-ID EINTRAGEN!) ===
 const ICONS = {
   tank: "🛡️",
-  heal: "<:rolehealer:1166755574734671992>", // <-- HIER DEINE ID
+  heal: "<:rolehealer:1469798353599594546>", // <-- HIER DEINE ID
   dps: "⚔️",
 };
 
@@ -101,7 +101,7 @@ client.once("ready", async () => {
     new ButtonBuilder()
       .setCustomId("heal")
       .setLabel("Heiler")
-      .setEmoji("1166755574734671992") // gleiche ID wie oben
+      .setEmoji("1469798353599594546") // gleiche ID wie oben
       .setStyle(ButtonStyle.Success),
 
     new ButtonBuilder()
@@ -164,3 +164,4 @@ client.on("interactionCreate", async interaction => {
 
 // === Login ===
 client.login(process.env.BOT_TOKEN);
+
