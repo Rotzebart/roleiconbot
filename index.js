@@ -103,3 +103,4 @@ client.on("interactionCreate", async (interaction) => {
 
 // === Bot Login ===
 client.login("MTQ2OTQ3MjkxNTQ1OTI3NjgzMg.GzPw5L.c_Zg-v5yIk7qec6yVDo2DZI02rEfyijjC-rci0"); // <-- Token hier direkt einsetzen
+
