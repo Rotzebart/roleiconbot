@@ -1,10 +1,16 @@
 // === Module laden ===
-const { Client, GatewayIntentBits, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require("discord.js");
+const {
+  Client,
+  GatewayIntentBits,
+  ActionRowBuilder,
+  ButtonBuilder,
+  ButtonStyle,
+} = require("discord.js");
 const express = require("express");
 const fs = require("fs");
 const path = require("path");
 
-// === Keep-Alive Server für Railway / Replit ===
+// === Keep-Alive Server (Replit / Railway) ===
 const app = express();
 app.get("/", (req, res) => res.send("Bot läuft 24/7"));
 app.listen(3000, () => console.log("🌐 Keep-Alive Server gestartet"));
@@ -14,22 +20,24 @@ const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMembers],
 });
 
-// === Icons ===
+// === ICONS (HIER EMOJI-ID EINTRAGEN!) ===
 const ICONS = {
   tank: "🛡️",
-  heal: "🩹",
+  heal: "<:rolehealer:1166755574734671992>", // <-- HIER DEINE ID
   dps: "⚔️",
 };
 
 // === Hilfsfunktionen ===
 function cleanName(name) {
-  return name.replace(/🛡️|🩹|⚔️/g, "").trim();
+  return name
+    .replace(/🛡️|⚔️|<:rolehealer:\d+>/g, "")
+    .trim();
 }
 
 function parseIcons(name) {
   const icons = [];
   if (name.includes("🛡️")) icons.push("tank");
-  if (name.includes("🩹")) icons.push("heal");
+  if (name.includes("<:rolehealer:")) icons.push("heal");
   if (name.includes("⚔️")) icons.push("dps");
   return icons;
 }
@@ -38,13 +46,13 @@ function buildNameWithIcons(nickname, icons) {
   const iconStr = icons.map(i => ICONS[i]).join("");
   let newName = `${iconStr} ${nickname}`;
   if (newName.length > 32) {
-    const allowedLength = 32 - iconStr.length - 1;
-    newName = `${iconStr} ${nickname.slice(0, allowedLength)}`;
+    const allowed = 32 - iconStr.length - 1;
+    newName = `${iconStr} ${nickname.slice(0, allowed)}`;
   }
   return newName;
 }
 
-// === JSON-Datei für Message-ID ===
+// === Message-ID speichern ===
 const DATA_FILE = path.join(__dirname, "roleMessage.json");
 
 function saveMessageId(id) {
@@ -65,54 +73,68 @@ client.once("ready", async () => {
   console.log(`✅ Eingeloggt als ${client.user.tag}`);
 
   const guild = client.guilds.cache.first();
-  if (!guild) return console.log("⚠️ Bot ist in keinem Server!");
+  if (!guild) return console.log("⚠️ Kein Server gefunden");
 
   const channel = guild.channels.cache.get("1469483502503333938"); // <-- Channel-ID
-  if (!channel) return console.log("⚠️ Channel nicht gefunden!");
+  if (!channel) return console.log("⚠️ Channel nicht gefunden");
 
   const botMember = guild.members.cache.get(client.user.id);
-  if (!channel.permissionsFor(botMember).has(["SendMessages", "ViewChannel"])) {
-    return console.log("⚠️ Bot hat keine Berechtigung, in diesem Channel zu schreiben oder ihn zu sehen!");
+  if (!channel.permissionsFor(botMember)?.has(["ViewChannel", "SendMessages"])) {
+    return console.log("⚠️ Fehlende Channel-Rechte");
   }
 
-  // === Prüfen, ob Nachricht schon existiert ===
-  let roleMessageId = loadMessageId();
-  if (roleMessageId) {
+  const savedId = loadMessageId();
+  if (savedId) {
     try {
-      const msg = await channel.messages.fetch(roleMessageId);
-      if (msg) return console.log("📨 Nachricht existiert bereits, sende nichts neu");
-    } catch {
-      // Nachricht existiert nicht mehr → neue Nachricht senden
-    }
+      await channel.messages.fetch(savedId);
+      console.log("📨 Button-Nachricht existiert bereits");
+      return;
+    } catch {}
   }
 
-  // === Buttons erstellen ===
   const row = new ActionRowBuilder().addComponents(
-    new ButtonBuilder().setCustomId("tank").setLabel("🛡️ Tank").setStyle(ButtonStyle.Primary),
-    new ButtonBuilder().setCustomId("heal").setLabel("🩹 Heiler").setStyle(ButtonStyle.Success),
-    new ButtonBuilder().setCustomId("dps").setLabel("⚔️ DD").setStyle(ButtonStyle.Danger),
-    new ButtonBuilder().setCustomId("reset").setLabel("❌ Reset").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder()
+      .setCustomId("tank")
+      .setLabel("🛡️ Tank")
+      .setStyle(ButtonStyle.Primary),
+
+    new ButtonBuilder()
+      .setCustomId("heal")
+      .setLabel("Heiler")
+      .setEmoji("1166755574734671992") // gleiche ID wie oben
+      .setStyle(ButtonStyle.Success),
+
+    new ButtonBuilder()
+      .setCustomId("dps")
+      .setLabel("⚔️ DD")
+      .setStyle(ButtonStyle.Danger),
+
+    new ButtonBuilder()
+      .setCustomId("reset")
+      .setLabel("❌ Reset")
+      .setStyle(ButtonStyle.Secondary)
   );
 
-  try {
-    const message = await channel.send({
-      content: "🎮 **Wähle deine Rolle(n) für den Nickname:**\nKlicke auf die Buttons, um die Rollen vor deinem Namen anzuzeigen. Klicke erneut, um sie zu entfernen.",
-      components: [row],
-    });
-    saveMessageId(message.id);
-    console.log("📨 Button-Message gesendet und ID gespeichert");
-  } catch (err) {
-    console.error("⚠️ Nachricht konnte nicht gesendet werden:", err.message);
-  }
+  const msg = await channel.send({
+    content:
+      "🎮 **Wähle deine Rolle(n) für den Nickname)**\nKlicken = an/aus • Reset = alles weg",
+    components: [row],
+  });
+
+  saveMessageId(msg.id);
+  console.log("📨 Button-Message gesendet");
 });
 
-// === Button Event ===
+// === Button Handling ===
 client.on("interactionCreate", async interaction => {
   if (!interaction.isButton()) return;
 
   const member = interaction.member;
-  if (member.permissions.has("ManageNicknames")) {
-    return interaction.reply({ content: "⚠️ Admins können nicht geändert werden!", ephemeral: true });
+  if (!member.manageable) {
+    return interaction.reply({
+      content: "⚠️ Ich kann deinen Nickname nicht ändern",
+      ephemeral: true,
+    });
   }
 
   const currentName = member.nickname || member.user.username;
@@ -128,23 +150,17 @@ client.on("interactionCreate", async interaction => {
     }
   }
 
-  try {
-    await member.setNickname(buildNameWithIcons(cleanName(currentName), icons));
+  await member.setNickname(
+    icons.length
+      ? buildNameWithIcons(cleanName(currentName), icons)
+      : cleanName(currentName)
+  );
 
-    // **Update die bestehende Nachricht** → nichts wird neu gepostet
-    await interaction.update({
-      content: interaction.message.content,
-      components: interaction.message.components,
-    });
-  } catch (err) {
-    console.error("Fehler beim Nickname ändern:", err);
-    if (interaction.replied || interaction.deferred) {
-      await interaction.followUp({ content: "⚠️ Konnte Icons nicht setzen (fehlende Rechte?)", ephemeral: true });
-    } else {
-      await interaction.reply({ content: "⚠️ Konnte Icons nicht setzen (fehlende Rechte?)", ephemeral: true });
-    }
-  }
+  await interaction.reply({
+    content: "✅ Nickname aktualisiert",
+    ephemeral: true,
+  });
 });
 
-// === Bot Login ===
-client.login(process.env.BOT_TOKEN); // <-- Railway Variable
+// === Login ===
+client.login(process.env.BOT_TOKEN);
