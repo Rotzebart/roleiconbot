@@ -49,10 +49,12 @@ function parseIcons(name) {
 
 function buildNameWithIcons(nickname, icons) {
   const iconStr = icons.map(i => ICONS[i]).join("");
-  let newName = `${iconStr} ${nickname}`;
+  let newName = `${nickname} ${iconStr}`.trim();
+
+  // Nickname darf max. 32 Zeichen sein
   if (newName.length > 32) {
     const allowed = 32 - iconStr.length - 1;
-    newName = `${iconStr} ${nickname.slice(0, allowed)}`;
+    newName = `${nickname.slice(0, allowed)} ${iconStr}`.trim();
   }
   return newName;
 }
@@ -73,12 +75,38 @@ function loadMessageId() {
   }
 }
 
+// === Alte Nicknames korrigieren (Icons rechts setzen) ===
+async function fixNicknames(guild) {
+  guild.members.cache.forEach(async member => {
+    if (!member.manageable) return;
+
+    const currentName = member.nickname || member.user.username;
+    const icons = parseIcons(currentName);
+    const clean = cleanName(currentName);
+
+    if (icons.length) {
+      const newName = buildNameWithIcons(clean, icons);
+      if ((member.nickname || member.user.username) !== newName) {
+        try {
+          await member.setNickname(newName);
+          console.log(`✅ Nickname von ${member.user.tag} korrigiert`);
+        } catch (err) {
+          console.log(`⚠️ Konnte ${member.user.tag} nicht ändern:`, err.message);
+        }
+      }
+    }
+  });
+}
+
 // === Ready Event ===
 client.once("ready", async () => {
   console.log(`✅ Eingeloggt als ${client.user.tag}`);
 
   const guild = client.guilds.cache.first();
   if (!guild) return console.log("⚠️ Kein Server gefunden");
+
+  // Alle alten Nicknames fixen
+  await fixNicknames(guild);
 
   const channel = guild.channels.cache.get("1469483502503333938"); // <-- Channel-ID
   if (!channel) return console.log("⚠️ Channel nicht gefunden");
@@ -100,18 +128,20 @@ client.once("ready", async () => {
   const row = new ActionRowBuilder().addComponents(
     new ButtonBuilder()
       .setCustomId("tank")
-      .setLabel("🛡️ Tank")
+      .setLabel("Tank")
+      .setEmoji(ICONS.tank)
       .setStyle(ButtonStyle.Primary),
 
     new ButtonBuilder()
       .setCustomId("heal")
       .setLabel("Heiler")
-      .setEmoji("💚") // ✅ Unicode grünes Herz
+      .setEmoji(ICONS.heal)
       .setStyle(ButtonStyle.Success),
 
     new ButtonBuilder()
       .setCustomId("dps")
-      .setLabel("⚔️ DD")
+      .setLabel("DD")
+      .setEmoji(ICONS.dps)
       .setStyle(ButtonStyle.Danger),
 
     new ButtonBuilder()
@@ -144,6 +174,7 @@ client.on("interactionCreate", async interaction => {
 
   const currentName = member.nickname || member.user.username;
   let icons = parseIcons(currentName);
+  const clean = cleanName(currentName);
 
   if (interaction.customId === "reset") {
     icons = [];
@@ -155,11 +186,9 @@ client.on("interactionCreate", async interaction => {
     }
   }
 
-  await member.setNickname(
-    icons.length
-      ? buildNameWithIcons(cleanName(currentName), icons)
-      : cleanName(currentName)
-  );
+  const newName = icons.length ? buildNameWithIcons(clean, icons) : clean;
+
+  await member.setNickname(newName);
 
   await interaction.reply({
     content: "✅ Nickname aktualisiert",
