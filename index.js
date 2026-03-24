@@ -108,7 +108,7 @@ client.once("ready", async () => {
   // Alle alten Nicknames fixen
   await fixNicknames(guild);
 
-  const channel = guild.channels.cache.get("1469483502503333938"); // <-- Channel-ID
+  const channel = guild.channels.cache.get("1485938183618301982"); // <-- Channel-ID
   if (!channel) return console.log("⚠️ Channel nicht gefunden");
 
   const botMember = guild.members.cache.get(client.user.id);
